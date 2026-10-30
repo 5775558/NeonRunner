@@ -1,0 +1,442 @@
+&lt;!doctype html&gt;
+&lt;html lang="zh-CN"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"&gt;
+&lt;title&gt;星际疾跑&lt;/title&gt;
+&lt;style&gt;
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1a;font-family:'Segoe UI',Arial,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%}
+#ui-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#ui-layer &gt; div{pointer-events:auto}
+.screen{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,26,0.92)}
+.title{font-size:clamp(36px,8vw,64px);font-weight:900;color:#0ff;text-shadow:0 0 20px #0ff,0 0 40px #08f;margin-bottom:10px;letter-spacing:4px}
+.subtitle{font-size:clamp(14px,3vw,20px);color:#f0f;text-shadow:0 0 10px #f0f;margin-bottom:30px}
+.btn{padding:14px 40px;font-size:clamp(16px,3.5vw,22px);font-weight:700;color:#fff;border:2px solid #0ff;border-radius:8px;background:linear-gradient(135deg,#0a2a4a,#0a1a3a);text-shadow:0 0 8px #0ff;cursor:pointer;pointer-events:auto;transition:all 0.2s;margin:6px;text-align:center;min-width:180px}
+.btn:hover,.btn:active{background:linear-gradient(135deg,#0a4a7a,#0a3a6a);box-shadow:0 0 20px #0ff,0 0 40px #08f;transform:scale(1.05)}
+.info{font-size:clamp(11px,2.2vw,15px);color:#88a;margin:4px 0;text-align:center}
+#hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none}
+#hud &gt; div{color:#fff;font-size:clamp(13px,2.5vw,18px);text-shadow:0 0 8px #0ff;background:rgba(0,0,0,0.5);padding:5px 12px;border-radius:6px}
+#pause-btn{position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);border:1px solid #0ff;border-radius:6px;color:#0ff;font-size:clamp(14px,3vw,20px);padding:6px 14px;cursor:pointer;pointer-events:auto;z-index:20}
+#controls{position:absolute;bottom:20px;left:0;right:0;display:flex;justify-content:center;gap:15px;padding:0 20px;pointer-events:none}
+.ctrl-btn{width:clamp(55px,15vw,75px);height:clamp(55px,15vw,75px);border-radius:50%;background:rgba(0,255,255,0.12);border:2px solid rgba(0,255,255,0.4);color:#0ff;font-size:clamp(18px,4vw,28px);display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer}
+.ctrl-btn:active{background:rgba(0,255,255,0.3)}
+.goals-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:15px 0}
+.goals-grid span{font-size:clamp(12px,2.5vw,16px);color:#ccc}
+.goals-grid span:first-child{font-weight:700;color:#0ff}
+.hidden{display:none !important}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;canvas id="game"&gt;&lt;/canvas&gt;
+&lt;div id="ui-layer"&gt;
+  &lt;div id="hud" class="hidden"&gt;
+    &lt;div&gt;距离: &lt;span id="dist"&gt;0&lt;/span&gt;m&lt;/div&gt;
+    &lt;div&gt;分数: &lt;span id="score"&gt;0&lt;/span&gt;&lt;/div&gt;
+    &lt;div&gt;金币: &lt;span id="coins"&gt;0&lt;/span&gt;&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;button id="pause-btn" class="hidden"&gt;⏸&lt;/button&gt;
+  &lt;div id="start-screen" class="screen"&gt;
+    &lt;div class="title"&gt;星际疾跑&lt;/div&gt;
+    &lt;div class="subtitle"&gt;Neon Runner&lt;/div&gt;
+    &lt;button class="btn" id="start-btn"&gt;开始游戏&lt;/button&gt;
+    &lt;div class="info"&gt;手机: 左右滑动换道 · 上滑跳跃 · 下滑翻滚&lt;/div&gt;
+    &lt;div class="info"&gt;键盘: A/D换道 · 空格跳跃 · S翻滚 · P暂停&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div id="gameover-screen" class="screen hidden"&gt;
+    &lt;div class="title"&gt;游戏结束&lt;/div&gt;
+    &lt;div class="goals-grid"&gt;
+      &lt;span&gt;距离:&lt;/span&gt;&lt;span id="go-dist"&gt;0m&lt;/span&gt;
+      &lt;span&gt;分数:&lt;/span&gt;&lt;span id="go-score"&gt;0&lt;/span&gt;
+      &lt;span&gt;金币:&lt;/span&gt;&lt;span id="go-coins"&gt;0&lt;/span&gt;
+      &lt;span&gt;最高分:&lt;/span&gt;&lt;span id="go-best"&gt;0&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;button class="btn" id="restart-btn"&gt;再来一次&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div id="pause-screen" class="screen hidden"&gt;
+    &lt;div class="title"&gt;暂停&lt;/div&gt;
+    &lt;button class="btn" id="resume-btn"&gt;继续游戏&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div id="controls"&gt;
+    &lt;div class="ctrl-btn" id="btn-left"&gt;◀&lt;/div&gt;
+    &lt;div class="ctrl-btn" id="btn-jump"&gt;▲&lt;/div&gt;
+    &lt;div class="ctrl-btn" id="btn-roll"&gt;▼&lt;/div&gt;
+    &lt;div class="ctrl-btn" id="btn-right"&gt;▶&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;script&gt;
+var canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+var W,H,laneW,groundY,LANE_COUNT=3;
+var STATE="start",paused=false,score=0,dist=0,coinCount=0,lives=3,speed=4,baseSpeed=4,highScore=parseInt(localStorage.getItem("neonRunnerBest"))||0;
+var player={lane:1,x:0,y:0,w:40,h:50,vy:0,jumping:false,rolling:false,rollTimer:0,invTimer:0};
+var obstacles=[],coinItems=[],stars=[],particles=[];
+var keys={};
+var lastTime=0,spawnTimer=0,coinSpawnTimer=0;
+var touchStartX=0,touchStartY=0,touchStartTime=0;
+
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+  laneW=Math.min(W/3,120);
+  groundY=H*0.75;
+  player.y=groundY-player.h;
+  player.w=Math.min(laneW*0.5,45);
+  player.h=Math.min(laneW*0.9,55);
+  player.y=groundY-player.h;
+  player.x=getLaneX(player.lane);
+}
+
+function getLaneX(lane){
+  var totalW=laneW*LANE_COUNT;
+  var offsetX=(W-totalW)/2;
+  return offsetX+lane*laneW+laneW/2;
+}
+
+// Stars background
+for(var i=0;i&lt;80;i++){
+  stars.push({x:Math.random()*1200,y:Math.random()*600,s:Math.random()*2+0.5,sp:Math.random()*0.5+0.2});
+}
+
+// Input
+document.addEventListener("keydown",function(e){
+  keys[e.key.toLowerCase()]=true;
+  if(e.key===" "){e.preventDefault();doJump();}
+  if(e.key.toLowerCase()==="p")togglePause();
+  if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")moveLeft();
+  if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")moveRight();
+  if(e.key==="ArrowDown"||e.key.toLowerCase()==="s")doRoll();
+});
+document.addEventListener("keyup",function(e){keys[e.key.toLowerCase()]=false;});
+
+canvas.addEventListener("touchstart",function(e){
+  e.preventDefault();
+  touchStartX=e.touches[0].clientX;
+  touchStartY=e.touches[0].clientY;
+  touchStartTime=Date.now();
+},{passive:false});
+
+canvas.addEventListener("touchmove",function(e){e.preventDefault();},{passive:false});
+
+canvas.addEventListener("touchend",function(e){
+  e.preventDefault();
+  var dx=e.changedTouches[0].clientX-touchStartX;
+  var dy=e.changedTouches[0].clientY-touchStartY;
+  var dt=Date.now()-touchStartTime;
+  var adx=Math.abs(dx),ady=Math.abs(dy);
+  if(adx&lt;20&amp;&amp;ady&lt;20&amp;&amp;dt&lt;300){
+    return;
+  }
+  if(adx&gt;ady){
+    if(dx&gt;30)moveRight();
+    else if(dx&lt;-30)moveLeft();
+  }else{
+    if(dy&lt;-30)doJump();
+    else if(dy&gt;30)doRoll();
+  }
+},{passive:false});
+
+// Button controls
+document.getElementById("btn-left").addEventListener("touchstart",function(e){e.preventDefault();moveLeft();});
+document.getElementById("btn-right").addEventListener("touchstart",function(e){e.preventDefault();moveRight();});
+document.getElementById("btn-jump").addEventListener("touchstart",function(e){e.preventDefault();doJump();});
+document.getElementById("btn-roll").addEventListener("touchstart",function(e){e.preventDefault();doRoll();});
+document.getElementById("pause-btn").addEventListener("click",togglePause);
+
+// Start game
+document.getElementById("start-btn").addEventListener("click",function(){
+  initGame();
+  STATE="playing";
+  document.getElementById("start-screen").classList.add("hidden");
+  document.getElementById("hud").classList.remove("hidden");
+  document.getElementById("pause-btn").classList.remove("hidden");
+  document.getElementById("controls").classList.remove("hidden");
+  lastTime=performance.now();
+  requestAnimationFrame(gameLoop);
+});
+
+// Restart
+document.getElementById("restart-btn").addEventListener("click",function(){
+  initGame();
+  STATE="playing";
+  document.getElementById("gameover-screen").classList.add("hidden");
+  document.getElementById("hud").classList.remove("hidden");
+  document.getElementById("pause-btn").classList.remove("hidden");
+  document.getElementById("controls").classList.remove("hidden");
+  lastTime=performance.now();
+  requestAnimationFrame(gameLoop);
+});
+
+// Pause
+document.getElementById("resume-btn").addEventListener("click",function(){
+  togglePause();
+});
+
+function togglePause(){
+  if(STATE==="playing"){
+    STATE="paused";
+    paused=true;
+    document.getElementById("pause-screen").classList.remove("hidden");
+  }else if(STATE==="paused"){
+    STATE="playing";
+    paused=false;
+    document.getElementById("pause-screen").classList.add("hidden");
+    lastTime=performance.now();
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+function initGame(){
+  score=0;dist=0;coinCount=0;lives=3;speed=baseSpeed;
+  player.lane=1;
+  player.x=getLaneX(1);
+  player.y=groundY-player.h;
+  player.vy=0;player.jumping=false;player.rolling=false;player.rollTimer=0;player.invTimer=0;
+  obstacles=[];coinItems=[];particles=[];
+  spawnTimer=0;coinSpawnTimer=0;
+  updateHUD();
+}
+
+function moveLeft(){
+  if(player.lane&gt;0){player.lane--;player.x=getLaneX(player.lane);}
+}
+function moveRight(){
+  if(player.lane&lt;LANE_COUNT-1){player.lane++;player.x=getLaneX(player.lane);}
+}
+function doJump(){
+  if(!player.jumping){
+    player.jumping=true;
+    player.vy=-12;
+  }
+}
+function doRoll(){
+  if(!player.jumping&amp;&amp;!player.rolling){
+    player.rolling=true;
+    player.rollTimer=30;
+  }
+}
+
+function spawnObstacle(){
+  var lane=Math.floor(Math.random()*LANE_COUNT);
+  var types=["block","spike","tall"];
+  var type=types[Math.floor(Math.random()*types.length)];
+  var o={lane:lane,type:type,x:getLaneX(lane),y:groundY,w:laneW*0.4,h:0};
+  if(type==="block"){o.h=40;o.y=groundY-40;}
+  else if(type==="spike"){o.h=30;o.y=groundY-30;}
+  else if(type==="tall"){o.h=70;o.y=groundY-70;}
+  obstacles.push(o);
+}
+
+function spawnCoin(){
+  var lane=Math.floor(Math.random()*LANE_COUNT);
+  coinItems.push({lane:lane,x:getLaneX(lane),y:groundY-Math.random()*80-40,r:12,collected:false});
+}
+
+function updateHUD(){
+  document.getElementById("dist").textContent=Math.floor(dist);
+  document.getElementById("score").textContent=Math.floor(score);
+  document.getElementById("coins").textContent=coinCount;
+}
+
+// Collision
+function rectsOverlap(ax,ay,aw,ah,bx,by,bw,bh){
+  return ax&lt;bx+bw&amp;&amp;ax+aw&gt;bx&amp;&amp;ay&lt;by+bh&amp;&amp;ay+ah&gt;by;
+}
+
+function hitObstacle(){
+  if(player.invTimer&gt;0)return;
+  lives--;
+  player.invTimer=60;
+  for(var i=0;i&lt;15;i++){
+    particles.push({x:player.x,y:player.y+player.h/2,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:30,color:"#f44",s:3});
+  }
+  if(lives&lt;=0){
+    STATE="gameover";
+    if(score&gt;highScore){highScore=Math.floor(score);localStorage.setItem("neonRunnerBest",highScore);}
+    document.getElementById("go-dist").textContent=Math.floor(dist)+"m";
+    document.getElementById("go-score").textContent=Math.floor(score);
+    document.getElementById("go-coins").textContent=coinCount;
+    document.getElementById("go-best").textContent=highScore;
+    document.getElementById("gameover-screen").classList.remove("hidden");
+    document.getElementById("hud").classList.add("hidden");
+    document.getElementById("pause-btn").classList.add("hidden");
+    document.getElementById("controls").classList.add("hidden");
+  }
+}
+
+function collectCoin(c){
+  c.collected=true;
+  coinCount++;
+  score+=50;
+  for(var i=0;i&lt;8;i++){
+    particles.push({x:c.x,y:c.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:20,color:"#ff0",s:2});
+  }
+}
+
+// Drawing helpers
+function drawNeonRect(x,y,w,h,color,glow){
+  ctx.shadowColor=color;ctx.shadowBlur=glow||10;
+  ctx.fillStyle=color;
+  ctx.fillRect(x,y,w,h);
+  ctx.shadowBlur=0;
+}
+
+function drawNeonCircle(x,y,r,color,glow){
+  ctx.shadowColor=color;ctx.shadowBlur=glow||10;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+function drawPlayer(){
+  var px=player.x-player.w/2;
+  var py=player.rolling?player.y+player.h*0.4:player.y;
+  var ph=player.rolling?player.h*0.5:player.h;
+  var col=player.invTimer&gt;0?(Math.floor(player.invTimer/5)%2===0?"#fff":"#f44"):"#0ff";
+  drawNeonRect(px,py,player.w,ph,col,15);
+  ctx.fillStyle="#fff";
+  ctx.fillRect(px+player.w*0.25,py+ph*0.2,4,4);
+  ctx.fillRect(px+player.w*0.65,py+ph*0.2,4,4);
+}
+
+function drawObstacle(o){
+  if(o.type==="block")drawNeonRect(o.x-o.w/2,o.y,o.w,o.h,"#f0f",12);
+  else if(o.type==="spike"){
+    ctx.shadowColor="#f00";ctx.shadowBlur=10;
+    ctx.fillStyle="#f44";
+    ctx.beginPath();
+    ctx.moveTo(o.x-o.w/2,o.y+o.h);ctx.lineTo(o.x,o.y);ctx.lineTo(o.x+o.w/2,o.y+o.h);
+    ctx.fill();ctx.shadowBlur=0;
+  }
+  else if(o.type==="tall"){
+    drawNeonRect(o.x-o.w/2,o.y,o.w,o.h,"#f80",12);
+  }
+}
+
+// Game loop
+function gameLoop(now){
+  if(STATE!=="playing")return;
+  var dt=Math.min((now-lastTime)/16.67,3);
+  lastTime=now;
+  
+  dist+=speed*dt*0.1;
+  score+=speed*dt*0.5;
+  speed=baseSpeed+dist*0.01;
+  if(speed&gt;12)speed=12;
+  
+  // Player jump physics
+  if(player.jumping){
+    player.vy+=0.6*dt;
+    player.y+=player.vy*dt;
+    if(player.y&gt;=groundY-player.h){player.y=groundY-player.h;player.jumping=false;player.vy=0;}
+  }
+  
+  // Roll timer
+  if(player.rolling){
+    player.rollTimer-=dt;
+    if(player.rollTimer&lt;=0)player.rolling=false;
+  }
+  if(player.invTimer&gt;0)player.invTimer-=dt;
+  
+  // Spawn obstacles
+  spawnTimer-=dt;
+  if(spawnTimer&lt;=0){spawnObstacle();spawnTimer=Math.max(40,90-dist*0.5)+Math.random()*30;}
+  
+  // Spawn coins
+  coinSpawnTimer-=dt;
+  if(coinSpawnTimer&lt;=0){spawnCoin();coinSpawnTimer=50+Math.random()*40;}
+  
+  // Update obstacles
+  for(var i=obstacles.length-1;i&gt;=0;i--){
+    obstacles[i].x-=speed*dt;
+    if(obstacles[i].x&lt;-50){obstacles.splice(i,1);continue;}
+    var pw=player.w,ph=player.rolling?player.h*0.5:player.h;
+    var ptx=player.x-pw/2,pty=player.rolling?player.y+player.h*0.4:player.y;
+    var ot=obstacles[i];
+    if(rectsOverlap(ptx,pty,pw,ph,ot.x-ot.w/2,ot.y,ot.w,ot.h)){
+      hitObstacle();
+    }
+  }
+  
+  // Update coins
+  for(var i=coinItems.length-1;i&gt;=0;i--){
+    var c=coinItems[i];
+    c.x-=speed*dt;
+    if(c.x&lt;-50){coinItems.splice(i,1);continue;}
+    if(!c.collected){
+      var dx=player.x-c.x,dy=(player.y+player.h/2)-c.y;
+      if(Math.sqrt(dx*dx+dy*dy)&lt;c.r+20)collectCoin(c);
+    }
+  }
+  
+  // Update particles
+  for(var i=particles.length-1;i&gt;=0;i--){
+    var p=particles[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+    if(p.life&lt;0)particles.splice(i,1);
+  }
+  
+  // Keyboard controls during play
+  if(keys["arrowleft"]||keys["a"])moveLeft();
+  if(keys["arrowright"]||keys["d"])moveRight();
+  if(keys[" "]){doJump();keys[" "]=false;}
+  if(keys["arrowdown"]||keys["s"]){doRoll();keys["arrowdown"]=false;keys["s"]=false;}
+  
+  // Draw
+  ctx.fillStyle="#0a0a1a";ctx.fillRect(0,0,W,H);
+  
+  // Stars
+  for(var i=0;i&lt;stars.length;i++){
+    var s=stars[i];
+    s.x-=s.sp*speed*0.3;
+    if(s.x&lt;0)s.x+=1200;
+    ctx.fillStyle="rgba(255,255,255,0.6)";
+    ctx.fillRect(s.x%W,s.y%H,s.s,s.s);
+  }
+  
+  // Lane lines
+  ctx.strokeStyle="rgba(0,255,255,0.15)";ctx.lineWidth=2;
+  var totalW=laneW*LANE_COUNT;var offsetX=(W-totalW)/2;
+  for(var i=0;i&lt;LANE_COUNT+1;i++){
+    ctx.beginPath();ctx.moveTo(offsetX+i*laneW,0);ctx.lineTo(offsetX+i*laneW,H);ctx.stroke();
+  }
+  
+  // Ground
+  var grd=ctx.createLinearGradient(0,groundY,0,H);
+  grd.addColorStop(0,"rgba(0,40,80,0.8)");grd.addColorStop(1,"rgba(0,10,20,0.9)");
+  ctx.fillStyle=grd;ctx.fillRect(0,groundY,W,H-groundY);
+  ctx.strokeStyle="#0ff";ctx.lineWidth=2;
+  ctx.shadowColor="#0ff";ctx.shadowBlur=8;
+  ctx.beginPath();ctx.moveTo(0,groundY);ctx.lineTo(W,groundY);ctx.stroke();
+  ctx.shadowBlur=0;
+  
+  // Obstacles
+  for(var i=0;i&lt;obstacles.length;i++)drawObstacle(obstacles[i]);
+  
+  // Coins
+  for(var i=0;i&lt;coinItems.length;i++){
+    var c=coinItems[i];
+    if(!c.collected)drawNeonCircle(c.x,c.y,c.r,"#ff0",15);
+  }
+  
+  // Player
+  drawPlayer();
+  
+  // Particles
+  for(var i=0;i&lt;particles.length;i++){
+    var p=particles[i];
+    ctx.globalAlpha=p.life/30;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s);
+  }
+  ctx.globalAlpha=1;
+  
+  updateHUD();
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener("resize",resize);
+resize();
+document.getElementById("controls").classList.add("hidden");
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
